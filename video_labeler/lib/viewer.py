@@ -35,7 +35,9 @@ class LabelStat():
         return self.labels_name[self.label]
 
 class VideoStat():
-    def __init__(self,border=30):
+    def __init__(self,labels_name,video_name,border=30):
+        self.labels_name = labels_name
+        self.video_name = video_name
         self.is_drug=False
         self.boxes=[]
         self.trackers=[]
@@ -47,18 +49,46 @@ class VideoStat():
         self.video_im=np.ones([320,320,3],np.uint8)
         self.border=border
         self.frame_id=0
-        os.system('mkdir -p img')
+
+        os.system('mkdir -p label')
+        self.label_file='label/%s_labels.txt' % self.video_name
+        os.system('mkdir -p img/%s' % self.video_name)
+
+    def update_labelname(self, labels_name):
+        self.labels_name = labels_name
 
     def update_im(self,im):
+
         self.video_im = im.copy()
+        filename = './img/%s/%05d.jpg' % (self.video_name, self.frame_id)
+        print(filename)
+
+        cv2.imwrite(filename, self.video_im)
+
         cv2.rectangle(self.video_im,
                       (self.border,self.border),(self.video_im.shape[1]-self.border,self.video_im.shape[0]-self.border),
                       (255,255,255))
+        
+        
+        with open(self.label_file,'a') as f:
+            f.write("%s" % filename)
+
         for i,box in enumerate(self.boxes):
             cv2.rectangle(self.video_im,box[0],box[1],self.colors[i])
             cv2.putText(self.video_im,self.labels[i],box[0],cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,255),2)
+            p0, p1 = box
+            label_name = self.labels[i]
+            label_index = self.labels_name.index(label_name) 
+            with open(self.label_file,'a') as f:
+                f.write(" %d,%d,%d,%d,%d"%(p0[0],p0[1],p1[0],p1[1],label_index))
+
+        with open(self.label_file,'a') as f:
+            f.write("\n")
+
         cv2.imshow("video", self.video_im)
-        cv2.imwrite('./img/%05d.jpg' % self.frame_id, self.video_im)
+        
+
+
 
     def update_box(self):
         border=self.border
@@ -76,7 +106,7 @@ class VideoStat():
 
     def remove_point_box(self,p):
         # remove the boxes in that point
-        print p
+        print(p)
         for idx,box in enumerate(self.boxes):
             p0,p1=box
             if p1[0]>p[0]>p0[0] and p1[1]>p[1]>p0[1]:
@@ -95,7 +125,7 @@ class VideoStat():
         cv2.imshow("video", self.video_im)
 
     def remove_box(self, idx):
-        print "remove box", self.boxes[idx]
+        print("remove box", self.boxes[idx])
         del self.boxes[idx]
         del self.colors[idx]
         del self.trackers[idx]
@@ -130,7 +160,9 @@ class GUILabeler():
         :param save_im: if write every cropped image to each label directory
         """
         self.cam = cv2.VideoCapture(video_file)
-        self.video_stat = VideoStat(border)
+        video_name = os.path.split(video_file)[-1]
+        video_name = os.path.splitext(video_name)[0]
+        self.video_stat = VideoStat(labels, video_name, border)
         self.label_stat = LabelStat(labels)
         self.labels=labels
         self.box_saver=box_saver
